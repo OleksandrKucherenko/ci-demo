@@ -1,0 +1,12 @@
+{
+  "name": "@ci-demo/cli",
+  "version": "0.1.0",
+  "bin": "dist/main.js",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "echo 'no tests yet'"
+  },
+  "dependencies": {
+    "@ci-demo/core": "*"
+  }
+}
