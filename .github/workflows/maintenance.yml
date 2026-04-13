@@ -24,11 +24,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  ENABLE_CLEANUP: ${{ vars.ENABLE_CLEANUP || 'false' }}
-  ENABLE_FILE_SYNC: ${{ vars.ENABLE_FILE_SYNC || 'false' }}
-  ENABLE_DEPRECATION: ${{ vars.ENABLE_DEPRECATION || 'false' }}
-  ENABLE_SECURITY_AUDIT: ${{ vars.ENABLE_SECURITY_AUDIT || 'false' }}
-  ENABLE_DEPENDENCY_UPDATE: ${{ vars.ENABLE_DEPENDENCY_UPDATE || 'false' }}
+  ENABLE_CLEANUP: ${{ vars.ENABLE_CLEANUP || 'true' }}
+  ENABLE_FILE_SYNC: ${{ vars.ENABLE_FILE_SYNC || 'true' }}
+  ENABLE_DEPRECATION: ${{ vars.ENABLE_DEPRECATION || 'true' }}
+  ENABLE_SECURITY_AUDIT: ${{ vars.ENABLE_SECURITY_AUDIT || 'true' }}
+  ENABLE_DEPENDENCY_UPDATE: ${{ vars.ENABLE_DEPENDENCY_UPDATE || 'true' }}
 
 jobs:
   cleanup:
@@ -44,7 +44,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
@@ -52,15 +52,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup old workflow runs
-        if: ${{ vars.ENABLE_CLEANUP == 'true' }}
+        if: ${{ (vars.ENABLE_CLEANUP || 'true') == 'true' }}
         run: ./scripts/ci/maintenance/ci-30-cleanup-workflow-runs.sh
 
       - name: Cleanup old artifacts
-        if: ${{ vars.ENABLE_CLEANUP == 'true' }}
+        if: ${{ (vars.ENABLE_CLEANUP || 'true') == 'true' }}
         run: ./scripts/ci/maintenance/ci-40-cleanup-artifacts.sh
 
       - name: Cleanup resources
-        if: ${{ vars.ENABLE_CLEANUP == 'true' }}
+        if: ${{ (vars.ENABLE_CLEANUP || 'true') == 'true' }}
         run: ./scripts/ci/maintenance/ci-50-cleanup-caches.sh
 
       - name: Report cleanup results
@@ -80,7 +80,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -91,7 +91,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Sync package.json and changelog
-        if: ${{ vars.ENABLE_FILE_SYNC == 'true' }}
+        if: ${{ (vars.ENABLE_FILE_SYNC || 'true') == 'true' }}
         run: ./scripts/ci/maintenance/ci-10-sync-files.sh
 
       - name: Check for changes
@@ -127,7 +127,7 @@ jobs:
       github.event.inputs.action == 'all'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
@@ -135,21 +135,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Identify versions to deprecate
-        if: ${{ vars.ENABLE_DEPRECATION == 'true' }}
+        if: ${{ (vars.ENABLE_DEPRECATION || 'true') == 'true' }}
         run: ./scripts/ci/maintenance/ci-70-identify-deprecated-versions.sh
 
       - name: Deprecate NPM versions
         if: |
-          vars.ENABLE_DEPRECATION == 'true' &&
-          vars.ENABLE_NPM_PUBLISH == 'true'
+          (vars.ENABLE_DEPRECATION || 'true') == 'true' &&
+          (vars.ENABLE_NPM_PUBLISH || 'true') == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: ./scripts/ci/maintenance/ci-75-deprecate-npm-versions.sh
 
       - name: Update GitHub releases
         if: |
-          vars.ENABLE_DEPRECATION == 'true' &&
-          vars.ENABLE_GITHUB_RELEASE == 'true'
+          (vars.ENABLE_DEPRECATION || 'true') == 'true' &&
+          (vars.ENABLE_GITHUB_RELEASE || 'true') == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/ci/maintenance/ci-80-deprecate-github-releases.sh
@@ -170,7 +170,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
@@ -181,16 +181,16 @@ jobs:
         run: ./scripts/ci/setup/ci-20-install-dependencies.sh
 
       - name: Run dependency audit
-        if: ${{ vars.ENABLE_SECURITY_AUDIT == 'true' }}
+        if: ${{ (vars.ENABLE_SECURITY_AUDIT || 'true') == 'true' }}
         run: ./scripts/ci/maintenance/ci-60-security-audit.sh
 
       - name: Run vulnerability scan
-        if: ${{ vars.ENABLE_SECURITY_AUDIT == 'true' }}
+        if: ${{ (vars.ENABLE_SECURITY_AUDIT || 'true') == 'true' }}
         run: ./scripts/ci/build/ci-30-security-scan.sh
 
       - name: Upload SARIF results
-        if: ${{ always() && vars.ENABLE_SECURITY_AUDIT == 'true' }}
-        uses: github/codeql-action/upload-sarif@v3
+        if: ${{ always() && (vars.ENABLE_SECURITY_AUDIT || 'true') == 'true' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: security-results.sarif
         continue-on-error: true
@@ -212,7 +212,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -223,11 +223,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update dependencies
-        if: ${{ vars.ENABLE_DEPENDENCY_UPDATE == 'true' }}
+        if: ${{ (vars.ENABLE_DEPENDENCY_UPDATE || 'true') == 'true' }}
         run: ./scripts/ci/maintenance/ci-90-update-dependencies.sh
 
       - name: Run tests
-        if: ${{ vars.ENABLE_DEPENDENCY_UPDATE == 'true' }}
+        if: ${{ (vars.ENABLE_DEPENDENCY_UPDATE || 'true') == 'true' }}
         run: ./scripts/ci/maintenance/ci-91-test-after-update.sh
 
       - name: Check for changes
@@ -270,15 +270,15 @@ jobs:
       RESULT_DEPENDENCY: ${{ needs['dependency-update'].result }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Generate summary
         env:
-          ENABLE_CLEANUP: ${{ vars.ENABLE_CLEANUP || 'false' }}
-          ENABLE_FILE_SYNC: ${{ vars.ENABLE_FILE_SYNC || 'false' }}
-          ENABLE_DEPRECATION: ${{ vars.ENABLE_DEPRECATION || 'false' }}
-          ENABLE_SECURITY_AUDIT: ${{ vars.ENABLE_SECURITY_AUDIT || 'false' }}
-          ENABLE_DEPENDENCY_UPDATE: ${{ vars.ENABLE_DEPENDENCY_UPDATE || 'false' }}
+          ENABLE_CLEANUP: ${{ vars.ENABLE_CLEANUP || 'true' }}
+          ENABLE_FILE_SYNC: ${{ vars.ENABLE_FILE_SYNC || 'true' }}
+          ENABLE_DEPRECATION: ${{ vars.ENABLE_DEPRECATION || 'true' }}
+          ENABLE_SECURITY_AUDIT: ${{ vars.ENABLE_SECURITY_AUDIT || 'true' }}
+          ENABLE_DEPENDENCY_UPDATE: ${{ vars.ENABLE_DEPENDENCY_UPDATE || 'true' }}
         run: ./scripts/ci/reports/ci-70-summary-maintenance.sh
 
       - name: Check if notifications enabled
