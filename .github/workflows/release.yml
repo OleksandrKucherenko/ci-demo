@@ -44,12 +44,12 @@ concurrency:
 
 env:
   # CI Feature Flags
-  ENABLE_COMPILE: ${{ vars.ENABLE_COMPILE || 'false' }}
-  ENABLE_TESTS: ${{ vars.ENABLE_TESTS || 'false' }}
-  ENABLE_NPM_PUBLISH: ${{ vars.ENABLE_NPM_PUBLISH || 'false' }}
-  ENABLE_GITHUB_RELEASE: ${{ vars.ENABLE_GITHUB_RELEASE || 'false' }}
-  ENABLE_DOCKER_PUBLISH: ${{ vars.ENABLE_DOCKER_PUBLISH || 'false' }}
-  ENABLE_DOCUMENTATION: ${{ vars.ENABLE_DOCUMENTATION || 'false' }}
+  ENABLE_COMPILE: ${{ vars.ENABLE_COMPILE || 'true' }}
+  ENABLE_TESTS: ${{ vars.ENABLE_TESTS || 'true' }}
+  ENABLE_NPM_PUBLISH: ${{ vars.ENABLE_NPM_PUBLISH || 'true' }}
+  ENABLE_GITHUB_RELEASE: ${{ vars.ENABLE_GITHUB_RELEASE || 'true' }}
+  ENABLE_DOCKER_PUBLISH: ${{ vars.ENABLE_DOCKER_PUBLISH || 'true' }}
+  ENABLE_DOCUMENTATION: ${{ vars.ENABLE_DOCUMENTATION || 'true' }}
 
 jobs:
   # Job 1: Manual Trigger -> Create Tag
@@ -64,7 +64,7 @@ jobs:
       CI_DRY_RUN: ${{ github.event.inputs.dry-run }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -97,7 +97,7 @@ jobs:
       is-prerelease: ${{ steps.parse.outputs.is-prerelease }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -115,10 +115,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: prepare
-    if: ${{ vars.ENABLE_COMPILE == 'true' }}
+    if: ${{ (vars.ENABLE_COMPILE || 'true') == 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
         env:
@@ -130,11 +130,12 @@ jobs:
       - name: Bundle
         run: ./scripts/ci/build/ci-40-bundle.sh
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-artifacts
           path: |
             dist/
+            packages/*/dist/
             build/
             *.tgz
             *.tar.gz
@@ -145,10 +146,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: build
-    if: ${{ vars.ENABLE_TESTS == 'true' }}
+    if: ${{ (vars.ENABLE_TESTS || 'true') == 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
         env:
@@ -156,7 +157,8 @@ jobs:
       - name: Install dependencies
         run: ./scripts/ci/setup/ci-20-install-dependencies.sh
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        continue-on-error: true
+        uses: actions/download-artifact@v7
         with:
           name: release-artifacts
       - name: Run unit tests
@@ -167,6 +169,8 @@ jobs:
   publish-npm:
     name: Publish to NPM
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     timeout-minutes: 10
     needs: [prepare, build, test]
     if: |
@@ -174,23 +178,25 @@ jobs:
       needs.prepare.result == 'success' &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
-      vars.ENABLE_NPM_PUBLISH == 'true'
+      (vars.ENABLE_NPM_PUBLISH || 'true') == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 'lts/*'
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@ci-demo'
       - name: Download build artifacts
-        if: ${{ vars.ENABLE_COMPILE == 'true' }}
-        uses: actions/download-artifact@v4
+        if: ${{ (vars.ENABLE_COMPILE || 'true') == 'true' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v7
         with:
           name: release-artifacts
       - name: Publish to NPM
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI_IS_PRERELEASE: ${{ needs.prepare.outputs.is-prerelease }}
         run: ./scripts/ci/release/ci-66-publish-npm-release.sh
 
@@ -204,7 +210,7 @@ jobs:
       needs.prepare.result == 'success' &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
-      vars.ENABLE_GITHUB_RELEASE == 'true'
+      (vars.ENABLE_GITHUB_RELEASE || 'true') == 'true'
     permissions:
       contents: write
     env:
@@ -212,12 +218,13 @@ jobs:
       CI_IS_PRERELEASE: ${{ needs.prepare.outputs.is-prerelease }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Download build artifacts
-        if: ${{ vars.ENABLE_COMPILE == 'true' }}
-        uses: actions/download-artifact@v4
+        if: ${{ (vars.ENABLE_COMPILE || 'true') == 'true' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v7
         with:
           name: release-artifacts
       - name: Generate release notes
@@ -232,12 +239,14 @@ jobs:
           draft: false
           prerelease: ${{ needs.prepare.outputs.is-prerelease }}
       - name: Upload Release Assets
-        if: ${{ vars.ENABLE_COMPILE == 'true' }}
+        if: ${{ (vars.ENABLE_COMPILE || 'true') == 'true' }}
         run: ./scripts/ci/release/ci-30-upload-assets.sh
 
   publish-docker:
     name: Publish Docker Image
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     timeout-minutes: 10
     needs: [prepare, build, test]
     if: |
@@ -245,17 +254,12 @@ jobs:
       needs.prepare.result == 'success' &&
       (needs.build.result == 'success' || needs.build.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped') &&
-      vars.ENABLE_DOCKER_PUBLISH == 'true'
+      (vars.ENABLE_DOCKER_PUBLISH || 'true') == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -277,14 +281,14 @@ jobs:
       always() &&
       needs.prepare.result == 'success' &&
       (needs.publish-github.result == 'success' || needs.publish-github.result == 'skipped') &&
-      vars.ENABLE_DOCUMENTATION == 'true'
+      (vars.ENABLE_DOCUMENTATION || 'true') == 'true'
     permissions:
       contents: write
       pages: write
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
         env:
@@ -312,7 +316,7 @@ jobs:
       RESULT_PREPARE: ${{ needs.prepare.result }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Generate summary
         run: ./scripts/ci/reports/ci-95-summary-release.sh

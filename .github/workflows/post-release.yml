@@ -24,10 +24,13 @@ concurrency:
   group: post-release
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 env:
-  ENABLE_ROLLBACK: ${{ vars.ENABLE_ROLLBACK || 'false' }}
-  ENABLE_DEPLOYMENT_VERIFICATION: ${{ vars.ENABLE_DEPLOYMENT_VERIFICATION || 'false' }}
-  ENABLE_STABILITY_TAGGING: ${{ vars.ENABLE_STABILITY_TAGGING || 'false' }}
+  ENABLE_ROLLBACK: ${{ vars.ENABLE_ROLLBACK || 'true' }}
+  ENABLE_DEPLOYMENT_VERIFICATION: ${{ vars.ENABLE_DEPLOYMENT_VERIFICATION || 'true' }}
+  ENABLE_STABILITY_TAGGING: ${{ vars.ENABLE_STABILITY_TAGGING || 'true' }}
 
 jobs:
   verify-deployment:
@@ -43,7 +46,7 @@ jobs:
       CI_VERSION: ${{ github.event.inputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
@@ -55,19 +58,19 @@ jobs:
         run: ./scripts/ci/release/ci-05-select-version.sh
 
       - name: Verify NPM deployment
-        if: vars.ENABLE_NPM_PUBLISH == 'true'
+        if: (vars.ENABLE_NPM_PUBLISH || 'true') == 'true'
         env:
           CI_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/ci/release/ci-70-verify-npm-deployment.sh
 
       - name: Verify GitHub release
-        if: vars.ENABLE_GITHUB_RELEASE == 'true'
+        if: (vars.ENABLE_GITHUB_RELEASE || 'true') == 'true'
         env:
           CI_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/ci/release/ci-35-verify-github-release.sh
 
       - name: Verify Docker deployment
-        if: vars.ENABLE_DOCKER_PUBLISH == 'true'
+        if: (vars.ENABLE_DOCKER_PUBLISH || 'true') == 'true'
         env:
           CI_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/ci/release/ci-85-verify-docker-deployment.sh
@@ -89,7 +92,7 @@ jobs:
     timeout-minutes: 10
     if: |
       github.event.inputs.action == 'tag-stable' &&
-      vars.ENABLE_STABILITY_TAGGING == 'true'
+      (vars.ENABLE_STABILITY_TAGGING || 'true') == 'true'
     permissions:
       contents: write
     env:
@@ -97,12 +100,21 @@ jobs:
       CI_STABILITY_TAG: stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Create stable tag
-        run: ./scripts/ci/release/ci-07-apply-stability-tag.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${CI_VERSION#v}"
+          TAG="v${VERSION}-stable"
+          SHA=$(git rev-list -n1 "v${VERSION}" 2>/dev/null || echo "")
+          [ -z "$SHA" ] && echo "Tag v${VERSION} not found" && exit 1
+          gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/${TAG}" -X DELETE 2>/dev/null || true
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/${TAG}" -f sha="${SHA}"
+          echo "Tagged ${SHA:0:7} as ${TAG}"
 
   tag-unstable:
     name: Tag as Unstable
@@ -110,7 +122,7 @@ jobs:
     timeout-minutes: 10
     if: |
       github.event.inputs.action == 'tag-unstable' &&
-      vars.ENABLE_STABILITY_TAGGING == 'true'
+      (vars.ENABLE_STABILITY_TAGGING || 'true') == 'true'
     permissions:
       contents: write
     env:
@@ -118,12 +130,21 @@ jobs:
       CI_STABILITY_TAG: unstable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Create unstable tag
-        run: ./scripts/ci/release/ci-07-apply-stability-tag.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${CI_VERSION#v}"
+          TAG="v${VERSION}-unstable"
+          SHA=$(git rev-list -n1 "v${VERSION}" 2>/dev/null || echo "")
+          [ -z "$SHA" ] && echo "Tag v${VERSION} not found" && exit 1
+          gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/${TAG}" -X DELETE 2>/dev/null || true
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/${TAG}" -f sha="${SHA}"
+          echo "Tagged ${SHA:0:7} as ${TAG}"
 
   rollback:
     name: Rollback Release
@@ -131,14 +152,14 @@ jobs:
     timeout-minutes: 10
     if: |
       github.event.inputs.action == 'rollback' &&
-      vars.ENABLE_ROLLBACK == 'true'
+      (vars.ENABLE_ROLLBACK || 'true') == 'true'
     permissions:
       contents: write
     env:
       CI_VERSION: ${{ github.event.inputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -151,19 +172,19 @@ jobs:
         run: ./scripts/ci/release/ci-77-confirm-rollback.sh
 
       - name: Rollback NPM release
-        if: vars.ENABLE_NPM_PUBLISH == 'true'
+        if: (vars.ENABLE_NPM_PUBLISH || 'true') == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: ./scripts/ci/release/ci-75-rollback-npm.sh
 
       - name: Update GitHub release
-        if: vars.ENABLE_GITHUB_RELEASE == 'true'
+        if: (vars.ENABLE_GITHUB_RELEASE || 'true') == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/ci/release/ci-40-rollback-github.sh
 
       - name: Tag Docker images as deprecated
-        if: vars.ENABLE_DOCKER_PUBLISH == 'true'
+        if: (vars.ENABLE_DOCKER_PUBLISH || 'true') == 'true'
         run: ./scripts/ci/release/ci-90-rollback-docker.sh
 
       - name: Report rollback results
@@ -182,7 +203,7 @@ jobs:
       RESULT_ROLLBACK: ${{ needs.rollback.result }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Generate summary
         run: ./scripts/ci/reports/ci-90-summary-post-release.sh
