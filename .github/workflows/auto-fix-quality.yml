@@ -25,7 +25,7 @@ env:
   GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
   AUTO_COMMIT: ${{ vars.AUTO_COMMIT || 'true' }}
   AUTO_APPLY_FIXES: ${{ vars.AUTO_APPLY_FIXES || 'true' }}
-  PUSH_CHANGES: ${{ vars.PUSH_CHANGES || 'false' }}
+  PUSH_CHANGES: ${{ vars.PUSH_CHANGES || 'false' }} }}
   MISE_LOG_LEVEL: info
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -43,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload security reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-reports
           path: |
@@ -71,7 +71,7 @@ jobs:
 
       - name: Upload SARIF results
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: security-results.sarif
         continue-on-error: true

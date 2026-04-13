@@ -25,9 +25,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  ENABLE_ROLLBACK: ${{ vars.ENABLE_ROLLBACK || 'false' }}
-  ENABLE_DEPLOYMENT_VERIFICATION: ${{ vars.ENABLE_DEPLOYMENT_VERIFICATION || 'false' }}
-  ENABLE_STABILITY_TAGGING: ${{ vars.ENABLE_STABILITY_TAGGING || 'false' }}
+  ENABLE_ROLLBACK: ${{ vars.ENABLE_ROLLBACK || 'true' }}
+  ENABLE_DEPLOYMENT_VERIFICATION: ${{ vars.ENABLE_DEPLOYMENT_VERIFICATION || 'true' }}
+  ENABLE_STABILITY_TAGGING: ${{ vars.ENABLE_STABILITY_TAGGING || 'true' }}
 
 jobs:
   verify-deployment:
@@ -43,7 +43,7 @@ jobs:
       CI_VERSION: ${{ github.event.inputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
@@ -55,19 +55,19 @@ jobs:
         run: ./scripts/ci/release/ci-05-select-version.sh
 
       - name: Verify NPM deployment
-        if: vars.ENABLE_NPM_PUBLISH == 'true'
+        if: (vars.ENABLE_NPM_PUBLISH || 'true') == 'true'
         env:
           CI_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/ci/release/ci-70-verify-npm-deployment.sh
 
       - name: Verify GitHub release
-        if: vars.ENABLE_GITHUB_RELEASE == 'true'
+        if: (vars.ENABLE_GITHUB_RELEASE || 'true') == 'true'
         env:
           CI_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/ci/release/ci-35-verify-github-release.sh
 
       - name: Verify Docker deployment
-        if: vars.ENABLE_DOCKER_PUBLISH == 'true'
+        if: (vars.ENABLE_DOCKER_PUBLISH || 'true') == 'true'
         env:
           CI_VERSION: ${{ steps.version.outputs.version }}
         run: ./scripts/ci/release/ci-85-verify-docker-deployment.sh
@@ -89,7 +89,7 @@ jobs:
     timeout-minutes: 10
     if: |
       github.event.inputs.action == 'tag-stable' &&
-      vars.ENABLE_STABILITY_TAGGING == 'true'
+      (vars.ENABLE_STABILITY_TAGGING || 'true') == 'true'
     permissions:
       contents: write
     env:
@@ -97,7 +97,7 @@ jobs:
       CI_STABILITY_TAG: stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -110,7 +110,7 @@ jobs:
     timeout-minutes: 10
     if: |
       github.event.inputs.action == 'tag-unstable' &&
-      vars.ENABLE_STABILITY_TAGGING == 'true'
+      (vars.ENABLE_STABILITY_TAGGING || 'true') == 'true'
     permissions:
       contents: write
     env:
@@ -118,7 +118,7 @@ jobs:
       CI_STABILITY_TAG: unstable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -131,14 +131,14 @@ jobs:
     timeout-minutes: 10
     if: |
       github.event.inputs.action == 'rollback' &&
-      vars.ENABLE_ROLLBACK == 'true'
+      (vars.ENABLE_ROLLBACK || 'true') == 'true'
     permissions:
       contents: write
     env:
       CI_VERSION: ${{ github.event.inputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -151,19 +151,19 @@ jobs:
         run: ./scripts/ci/release/ci-77-confirm-rollback.sh
 
       - name: Rollback NPM release
-        if: vars.ENABLE_NPM_PUBLISH == 'true'
+        if: (vars.ENABLE_NPM_PUBLISH || 'true') == 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: ./scripts/ci/release/ci-75-rollback-npm.sh
 
       - name: Update GitHub release
-        if: vars.ENABLE_GITHUB_RELEASE == 'true'
+        if: (vars.ENABLE_GITHUB_RELEASE || 'true') == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/ci/release/ci-40-rollback-github.sh
 
       - name: Tag Docker images as deprecated
-        if: vars.ENABLE_DOCKER_PUBLISH == 'true'
+        if: (vars.ENABLE_DOCKER_PUBLISH || 'true') == 'true'
         run: ./scripts/ci/release/ci-90-rollback-docker.sh
 
       - name: Report rollback results
@@ -182,7 +182,7 @@ jobs:
       RESULT_ROLLBACK: ${{ needs.rollback.result }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Generate summary
         run: ./scripts/ci/reports/ci-90-summary-post-release.sh
