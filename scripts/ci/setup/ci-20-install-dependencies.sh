@@ -13,7 +13,11 @@ echo:Setup "Installing Project Dependencies"
 hooks:do begin "${BASH_SOURCE[0]##*/}"
 hooks:flow:apply
 
+ci:skip_if_no_hooks install
+
+set +eu
 hooks:declare install
 hooks:do install
+set -eu
 
 echo:Success "Dependency Installation Complete"

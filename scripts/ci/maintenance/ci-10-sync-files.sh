@@ -13,7 +13,11 @@ echo:Maint "Synchronizing Version Files"
 hooks:do begin "${BASH_SOURCE[0]##*/}"
 hooks:flow:apply
 
+ci:skip_if_no_hooks sync
+
+set +eu
 hooks:declare sync
 hooks:do sync
+set -eu
 
 echo:Success "Version Files Synchronization Complete"

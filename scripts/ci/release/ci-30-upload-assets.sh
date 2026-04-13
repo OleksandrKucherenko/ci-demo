@@ -14,7 +14,11 @@ ci:param release "CI_VERSION" "${CI_VERSION:?CI_VERSION is required}"
 hooks:do begin "${BASH_SOURCE[0]##*/}"
 hooks:flow:apply
 
+ci:skip_if_no_hooks upload
+
+set +eu
 hooks:declare upload
 hooks:do upload
+set -eu
 
 echo:Success "Release Assets Uploaded"

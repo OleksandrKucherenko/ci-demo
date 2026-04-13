@@ -14,7 +14,11 @@ ci:param release "CI_VERSION" "${CI_VERSION:?CI_VERSION is required}"
 hooks:do begin "${BASH_SOURCE[0]##*/}"
 hooks:flow:apply
 
+ci:skip_if_no_hooks update
+
+set +eu
 hooks:declare update
 hooks:do update
+set -eu
 
 echo:Success "Version Files Updated"

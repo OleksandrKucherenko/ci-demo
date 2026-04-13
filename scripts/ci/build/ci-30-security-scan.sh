@@ -13,7 +13,11 @@ echo:Security "Running Security Scans"
 hooks:do begin "${BASH_SOURCE[0]##*/}"
 hooks:flow:apply
 
+ci:skip_if_no_hooks scan
+
+set +eu
 hooks:declare scan
 hooks:do scan
+set -eu
 
 echo:Success "Security Scan Complete"

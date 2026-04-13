@@ -13,7 +13,11 @@ echo:Build "Running Linters"
 hooks:do begin "${BASH_SOURCE[0]##*/}"
 hooks:flow:apply
 
+ci:skip_if_no_hooks lint
+
+set +eu
 hooks:declare lint
 hooks:do lint
+set -eu
 
 echo:Success "Linting Complete"
