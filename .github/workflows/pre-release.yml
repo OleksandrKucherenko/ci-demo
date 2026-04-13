@@ -31,14 +31,14 @@ concurrency:
 env:
   # CI Feature Flags - Set these in GitHub Variables to activate jobs
   # Leave unset to skip jobs without failure
-  ENABLE_COMPILE: ${{ vars.ENABLE_COMPILE || 'false' }}
-  ENABLE_LINT: ${{ vars.ENABLE_LINT || 'false' }}
-  ENABLE_UNIT_TESTS: ${{ vars.ENABLE_UNIT_TESTS || 'false' }}
-  ENABLE_INTEGRATION_TESTS: ${{ vars.ENABLE_INTEGRATION_TESTS || 'false' }}
-  ENABLE_E2E_TESTS: ${{ vars.ENABLE_E2E_TESTS || 'false' }}
-  ENABLE_BUNDLE: ${{ vars.ENABLE_BUNDLE || 'false' }}
-  ENABLE_SECURITY_SCAN: ${{ vars.ENABLE_SECURITY_SCAN || 'false' }}
-  ENABLE_NOTIFICATIONS: ${{ vars.ENABLE_NOTIFICATIONS || 'false' }}
+  ENABLE_COMPILE: ${{ vars.ENABLE_COMPILE || 'true' }}
+  ENABLE_LINT: ${{ vars.ENABLE_LINT || 'true' }}
+  ENABLE_UNIT_TESTS: ${{ vars.ENABLE_UNIT_TESTS || 'true' }}
+  ENABLE_INTEGRATION_TESTS: ${{ vars.ENABLE_INTEGRATION_TESTS || 'true' }}
+  ENABLE_E2E_TESTS: ${{ vars.ENABLE_E2E_TESTS || 'true' }}
+  ENABLE_BUNDLE: ${{ vars.ENABLE_BUNDLE || 'true' }}
+  ENABLE_SECURITY_SCAN: ${{ vars.ENABLE_SECURITY_SCAN || 'true' }}
+  ENABLE_NOTIFICATIONS: ${{ vars.ENABLE_NOTIFICATIONS || 'false' }} }}
   # Customization Variables
   ARTIFACT_RETENTION_DAYS: ${{ vars.ARTIFACT_RETENTION_DAYS || 7 }}
   DELIVERABLE_RETENTION_DAYS: ${{ vars.DELIVERABLE_RETENTION_DAYS || 14 }}
@@ -55,7 +55,14 @@ jobs:
       !contains(github.event.head_commit.message, '[ci skip]')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup environment
         run: ./scripts/ci/setup/ci-10-install-tools.sh
@@ -66,7 +73,7 @@ jobs:
         run: ./scripts/ci/setup/ci-20-install-dependencies.sh
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -81,13 +88,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: setup
-    if: ${{ vars.ENABLE_COMPILE == 'true' }}
+    if: ${{ (vars.ENABLE_COMPILE || 'true') == 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore dependencies cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -99,13 +112,16 @@ jobs:
         run: ./scripts/ci/build/ci-10-compile.sh
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
           name: build-output
           path: |
             dist/
             build/
             out/
+            packages/*/dist/
+          if-no-files-found: ignore
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
 
   lint:
@@ -113,13 +129,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: setup
-    if: ${{ vars.ENABLE_LINT == 'true' }}
+    if: ${{ (vars.ENABLE_LINT || 'true') == 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore dependencies cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -135,13 +157,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: setup
-    if: ${{ vars.ENABLE_UNIT_TESTS == 'true' }}
+    if: ${{ (vars.ENABLE_UNIT_TESTS || 'true') == 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore dependencies cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -154,7 +182,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-results
           path: |
@@ -167,13 +195,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [setup, compile]
-    if: ${{ vars.ENABLE_INTEGRATION_TESTS == 'true' }}
+    if: ${{ (vars.ENABLE_INTEGRATION_TESTS || 'true') == 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore dependencies cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -182,8 +216,9 @@ jobs:
           key: ${{ runner.os }}-deps-${{ hashFiles('**/package*.json', '**/bun.lock') }}
 
       - name: Download build artifacts
-        if: ${{ vars.ENABLE_COMPILE == 'true' }}
-        uses: actions/download-artifact@v4
+        if: ${{ (vars.ENABLE_COMPILE || 'true') == 'true' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v7
         with:
           name: build-output
 
@@ -192,7 +227,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: integration-test-results
           path: |
@@ -205,13 +240,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [setup, compile]
-    if: ${{ vars.ENABLE_E2E_TESTS == 'true' }}
+    if: ${{ (vars.ENABLE_E2E_TESTS || 'true') == 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore dependencies cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -220,8 +261,9 @@ jobs:
           key: ${{ runner.os }}-deps-${{ hashFiles('**/package*.json', '**/bun.lock') }}
 
       - name: Download build artifacts
-        if: ${{ vars.ENABLE_COMPILE == 'true' }}
-        uses: actions/download-artifact@v4
+        if: ${{ (vars.ENABLE_COMPILE || 'true') == 'true' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v7
         with:
           name: build-output
 
@@ -230,7 +272,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-test-results
           path: |
@@ -246,12 +288,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: setup
-    if: ${{ vars.ENABLE_SECURITY_SCAN == 'true' }}
+    if: ${{ (vars.ENABLE_SECURITY_SCAN || 'true') == 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Full history for trufflehog to scan
+
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup mise and install tools
         run: ./scripts/ci/setup/ci-10-install-tools.sh
@@ -263,7 +312,7 @@ jobs:
 
       - name: Upload security reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-reports
           path: |
@@ -282,13 +331,19 @@ jobs:
       (needs.compile.result == 'success' || needs.compile.result == 'skipped') &&
       (needs.lint.result == 'success' || needs.lint.result == 'skipped') &&
       (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped') &&
-      vars.ENABLE_BUNDLE == 'true'
+      (vars.ENABLE_BUNDLE || 'true') == 'true'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore dependencies cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -297,8 +352,9 @@ jobs:
           key: ${{ runner.os }}-deps-${{ hashFiles('**/package*.json', '**/bun.lock') }}
 
       - name: Download build artifacts
-        if: ${{ vars.ENABLE_COMPILE == 'true' }}
-        uses: actions/download-artifact@v4
+        if: ${{ (vars.ENABLE_COMPILE || 'true') == 'true' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v7
         with:
           name: build-output
 
@@ -306,7 +362,7 @@ jobs:
         run: ./scripts/ci/build/ci-40-bundle.sh
 
       - name: Upload bundle artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bundle-output
           path: |
@@ -333,17 +389,23 @@ jobs:
       RESULT_BUNDLE: ${{ needs.bundle.result }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Generate summary
         env:
-          ENABLE_COMPILE: ${{ vars.ENABLE_COMPILE || 'false' }}
-          ENABLE_LINT: ${{ vars.ENABLE_LINT || 'false' }}
-          ENABLE_UNIT_TESTS: ${{ vars.ENABLE_UNIT_TESTS || 'false' }}
-          ENABLE_INTEGRATION_TESTS: ${{ vars.ENABLE_INTEGRATION_TESTS || 'false' }}
-          ENABLE_E2E_TESTS: ${{ vars.ENABLE_E2E_TESTS || 'false' }}
-          ENABLE_SECURITY_SCAN: ${{ vars.ENABLE_SECURITY_SCAN || 'false' }}
-          ENABLE_BUNDLE: ${{ vars.ENABLE_BUNDLE || 'false' }}
+          ENABLE_COMPILE: ${{ vars.ENABLE_COMPILE || 'true' }}
+          ENABLE_LINT: ${{ vars.ENABLE_LINT || 'true' }}
+          ENABLE_UNIT_TESTS: ${{ vars.ENABLE_UNIT_TESTS || 'true' }}
+          ENABLE_INTEGRATION_TESTS: ${{ vars.ENABLE_INTEGRATION_TESTS || 'true' }}
+          ENABLE_E2E_TESTS: ${{ vars.ENABLE_E2E_TESTS || 'true' }}
+          ENABLE_SECURITY_SCAN: ${{ vars.ENABLE_SECURITY_SCAN || 'true' }}
+          ENABLE_BUNDLE: ${{ vars.ENABLE_BUNDLE || 'true' }}
         run: ./scripts/ci/reports/ci-10-summary-pre-release.sh
 
       - name: Check for failures
@@ -357,8 +419,14 @@ jobs:
     if: always()
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
+      - name: Setup mise (cached)
+        uses: jdx/mise-action@v4
+        with:
+          cache: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Check if notifications enabled
         id: check_notify
         env:
