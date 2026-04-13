@@ -1,0 +1,5 @@
+# Trufflehog exclusions
+# Ignore GitHub Actions checkout credentials injected by actions/checkout
+.git/
+# Ignore CI scripts (no real secrets, only examples)
+scripts/ci/

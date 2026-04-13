@@ -40,7 +40,7 @@ jobs:
       OPS_CONFIRM: ${{ github.event.inputs.confirm }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate Inputs
         run: ./scripts/ci/ops/ci-10-validate-inputs.sh
